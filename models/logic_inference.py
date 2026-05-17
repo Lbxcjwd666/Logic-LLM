@@ -1,10 +1,16 @@
+"""
+cd d:\KG\Logic-LLM
+python models/logic_inference.py `
+    --dataset_name "ProntoQA" `
+    --split "dev" `
+    --model_name "qwen-max" `
+    --backup_strategy "random"
+"""
+
 import json
 import os
+import sys
 from tqdm import tqdm
-from symbolic_solvers.fol_solver.prover9_solver import FOL_Prover9_Program
-from symbolic_solvers.pyke_solver.pyke_solver import Pyke_Program
-from symbolic_solvers.csp_solver.csp_solver import CSP_Program
-from symbolic_solvers.z3_solver.sat_problem_solver import LSAT_Z3_Program
 import argparse
 import random
 from backup_answer_generation import Backup_Answer_Generator
@@ -19,12 +25,19 @@ class LogicInferenceEngine:
         self.backup_strategy = args.backup_strategy
 
         self.dataset = self.load_logic_programs()
-        program_executor_map = {'FOLIO': FOL_Prover9_Program, 
-                                'ProntoQA': Pyke_Program, 
-                                'ProofWriter': Pyke_Program,
-                                'LogicalDeduction': CSP_Program,
-                                'AR-LSAT': LSAT_Z3_Program}
-        self.program_executor = program_executor_map[self.dataset_name]
+        # 动态导入所需的求解器
+        if self.dataset_name == 'FOLIO':
+            from symbolic_solvers.fol_solver.prover9_solver import FOL_Prover9_Program
+            self.program_executor = FOL_Prover9_Program
+        elif self.dataset_name in ['ProntoQA', 'ProofWriter']:
+            from symbolic_solvers.pyke_solver.pyke_solver import Pyke_Program
+            self.program_executor = Pyke_Program
+        elif self.dataset_name == 'LogicalDeduction':
+            from symbolic_solvers.csp_solver.csp_solver import CSP_Program
+            self.program_executor = CSP_Program
+        elif self.dataset_name == 'AR-LSAT':
+            from symbolic_solvers.z3_solver.sat_problem_solver import LSAT_Z3_Program
+            self.program_executor = LSAT_Z3_Program
         self.backup_generator = Backup_Answer_Generator(self.dataset_name, self.backup_strategy, self.args.backup_LLM_result_path)
 
     def load_logic_programs(self):
